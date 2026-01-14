@@ -1,0 +1,39 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('Clone') {
+              steps {
+                git branch: 'main',
+                    credentialsId: 'jenkinsgit',
+                    url: '%s'
+            }
+        }
+        
+        stage('Build') {
+             steps {
+                sh 'echo %s | sudo -S sh -c "echo %s | docker login %s -u %s --password-stdin"'
+                sh 'echo %s | sudo -S docker build -t jenkinstest:latest .'
+                sh 'echo %s | sudo -S docker tag jenkinstest:latest %s/jenkinstest:latest'
+            }
+        }
+        
+        stage('Verify') {
+             steps {
+                sh 'echo %s | sudo -S docker images'
+            }
+        }
+        
+        stage('Push') {
+            steps{
+                 sh 'echo %s | sudo -S docker push %s/jenkinstest:latest'
+            }
+        }
+
+         stage('Run Container') {
+            steps{
+                sh 'echo %s | sudo -S docker run -d TZ="Asia/Seoul -p 8088:8088 --name jenkinstest %s/jenkinstest:latest'
+            }
+        }
+    }
+}
