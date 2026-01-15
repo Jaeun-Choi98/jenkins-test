@@ -1,39 +1,104 @@
 pipeline {
     agent any
     
+    environment {
+        REGISTRY_URL = '10.1.0.118:443'
+        REGISTRY_USER = 'theroad'
+        IMAGE_NAME = 'jenkins-test'
+    }
+    
     stages {
         stage('Clone') {
-              steps {
+            steps {
+                echo 'Cloning repository...'
                 git branch: 'main',
                     credentialsId: 'jenkinsgit',
-                    url: '%s'
+                    url: 'https://github.com/Jaeun-Choi98/jenkins-test'
+            }
+        }
+        
+        stage('Docker Login') {
+            steps {
+                echo 'Docker login...'
+                script {
+                    withCredentials([
+                        string(credentialsId: 'sudo-password', variable: 'SUDO_PWD'),
+                        string(credentialsId: 'docker-registry-password', variable: 'DOCKER_PWD')
+                    ]) {
+                        sh """
+                        echo \${DOCKER_PWD} | docker login \${REGISTRY_URL} -u \${REGISTRY_USER} --password-stdin
+                        """
+                    }
+                }
+                echo 'Login successful'
             }
         }
         
         stage('Build') {
-             steps {
-                sh 'echo %s | sudo -S sh -c "echo %s | docker login %s -u %s --password-stdin"'
-                sh 'echo %s | sudo -S docker build -t jenkinstest:latest .'
-                sh 'echo %s | sudo -S docker tag jenkinstest:latest %s/jenkinstest:latest'
+            steps {
+                echo 'Building image...'
+                script {
+                    withCredentials([
+                        string(credentialsId: 'sudo-password', variable: 'SUDO_PWD')
+                    ]) {
+                        sh """
+                        docker build -t \${REGISTRY_URL}/\${IMAGE_NAME}:\${BUILD_NUMBER} .
+                        """
+                    }
+                }
+                echo 'Build complete'
             }
         }
         
         stage('Verify') {
-             steps {
-                sh 'echo %s | sudo -S docker images'
+            steps {
+                echo 'Verifying image...'
+                script {
+                    withCredentials([
+                        string(credentialsId: 'sudo-password', variable: 'SUDO_PWD')
+                    ]) {
+                        sh """
+                        docker images | grep \${IMAGE_NAME}
+                        """
+                    }
+                }
             }
         }
         
         stage('Push') {
-            steps{
-                 sh 'echo %s | sudo -S docker push %s/jenkinstest:latest'
+            steps {
+                echo 'Pushing image...'
+                script {
+                    withCredentials([
+                        string(credentialsId: 'sudo-password', variable: 'SUDO_PWD')
+                    ]) {
+                        sh """
+                        docker push \${REGISTRY_URL}/\${IMAGE_NAME}:\${BUILD_NUMBER}
+                        """
+                    }
+                }
+                echo 'Push complete'
             }
         }
-
-         stage('Run Container') {
-            steps{
-                sh 'echo %s | sudo -S docker run -d TZ="Asia/Seoul -p 8088:8088 --name jenkinstest %s/jenkinstest:latest'
+    }
+    
+    post {
+        always {
+            script {
+                withCredentials([
+                    string(credentialsId: 'sudo-password', variable: 'SUDO_PWD')
+                ]) {
+                    sh """
+                    docker logout \${REGISTRY_URL} || true
+                    """
+                }
             }
+        }
+        success {
+            echo 'Pipeline succeeded!'
+        }
+        failure {
+            echo 'Pipeline failed!'
         }
     }
 }
