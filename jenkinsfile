@@ -22,7 +22,6 @@ pipeline {
                 echo 'Docker login...'
                 script {
                     withCredentials([
-                        string(credentialsId: 'sudo-password', variable: 'SUDO_PWD'),
                         string(credentialsId: 'docker-registry-password', variable: 'DOCKER_PWD')
                     ]) {
                         sh """
@@ -37,15 +36,9 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building image...'
-                script {
-                    withCredentials([
-                        string(credentialsId: 'sudo-password', variable: 'SUDO_PWD')
-                    ]) {
-                        sh """
-                        docker build -t \${REGISTRY_URL}/\${IMAGE_NAME}:\${BUILD_NUMBER} .
-                        """
-                    }
-                }
+                sh """
+                docker build -t \${REGISTRY_URL}/\${IMAGE_NAME}:\${BUILD_NUMBER} .
+                """
                 echo 'Build complete'
             }
         }
@@ -53,46 +46,41 @@ pipeline {
         stage('Verify') {
             steps {
                 echo 'Verifying image...'
-                script {
-                    withCredentials([
-                        string(credentialsId: 'sudo-password', variable: 'SUDO_PWD')
-                    ]) {
-                        sh """
-                        docker images | grep \${IMAGE_NAME}
-                        """
-                    }
-                }
+                sh """
+                docker images | grep \${IMAGE_NAME}
+                """
             }
         }
         
         stage('Push') {
-            steps {
-                echo 'Pushing image...'
-                script {
-                    withCredentials([
-                        string(credentialsId: 'sudo-password', variable: 'SUDO_PWD')
-                    ]) {
-                        sh """
-                        docker push \${REGISTRY_URL}/\${IMAGE_NAME}:\${BUILD_NUMBER}
-                        """
-                    }
-                }
-                echo 'Push complete'
-            }
+          steps {
+            echo 'Pushing image...'
+            sh """
+            docker push \${REGISTRY_URL}/\${IMAGE_NAME}:\${BUILD_NUMBER}
+            """
+            echo 'Push complete'
+          }
+        }
+
+        stage('Run Container') {
+          steps{
+           echo 'Running Container...'
+           sh """
+           docker rm $(docker ps -aqf "name=jenkinstest")
+           """
+
+           sh """
+           docker run -d TZ="Asia/Seoul" -p 8088:8088 --name jenkinstest \${REGISTRY_URL}/\${IMAGE_NAME}:\${BUILD_NUMBER}
+           """    
+          }
         }
     }
     
     post {
         always {
-            script {
-                withCredentials([
-                    string(credentialsId: 'sudo-password', variable: 'SUDO_PWD')
-                ]) {
-                    sh """
-                    docker logout \${REGISTRY_URL} || true
-                    """
-                }
-            }
+            sh """
+            docker logout \${REGISTRY_URL} || true
+            """
         }
         success {
             echo 'Pipeline succeeded!'

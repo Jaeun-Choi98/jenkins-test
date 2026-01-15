@@ -19,5 +19,5 @@ RUN npm install && npm run build
 FROM golang:1.24-alpine
 WORKDIR /home/app
 COPY --from=go-build /app/main /home/app/
-COPY --from=node-build /app/build /home/app/
+COPY --from=node-build /app/build /home/app/build
 CMD ["./main"]
