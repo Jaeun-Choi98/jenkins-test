@@ -66,11 +66,12 @@ pipeline {
           steps{
            echo 'Running Container...'
            sh """
-           docker rm \$(docker ps -aqf "name=jenkinstest")
+           docker stop \$(docker ps -aqf "name=jenkinstest") || true
+           docker rm \$(docker ps -aqf "name=jenkinstest") || true
            """
 
            sh """
-           docker run -d TZ="Asia/Seoul" -p 8088:8088 --name jenkinstest \${REGISTRY_URL}/\${IMAGE_NAME}:\${BUILD_NUMBER}
+           docker run -d -e TZ="Asia/Seoul" -p 8088:8088 --name jenkinstest \${REGISTRY_URL}/\${IMAGE_NAME}:\${BUILD_NUMBER}
            """    
           }
         }
